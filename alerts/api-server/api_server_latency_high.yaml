@@ -1,0 +1,23 @@
+groups:
+- name: api-server.latency
+  rules:
+  - alert: APIServerLatencyP95High
+    expr: histogram_quantile(0.95, sum by (le) (rate(apiserver_request_duration_seconds_bucket[5m]))) > 1
+    for: 15m
+    labels:
+      severity: warning
+      team: sre
+    annotations:
+      summary: API Server p95 latency high (>1s)
+      description: API Server p95 latency is above 1s
+      sop: API_SERVER_HIGH_LATENCY.md
+  - alert: APIServerLatencyP99High
+    expr: histogram_quantile(0.99, sum by (le) (rate(apiserver_request_duration_seconds_bucket[5m]))) > 2
+    for: 15m
+    labels:
+      severity: critical
+      team: sre
+    annotations:
+      summary: API Server p99 latency high (>2s)
+      description: API Server p99 latency is above 2s
+      sop: API_SERVER_HIGH_LATENCY.md

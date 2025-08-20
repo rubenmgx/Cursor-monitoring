@@ -1,0 +1,13 @@
+groups:
+- name: api-server.errors
+  rules:
+  - alert: APIServer5xxErrorRateHigh
+    expr: sum(rate(apiserver_request_total{code=~"5.."}[5m])) / sum(rate(apiserver_request_total[5m])) > 0.05
+    for: 15m
+    labels:
+      severity: warning
+      team: sre
+    annotations:
+      summary: API Server 5xx error rate high (>5%)
+      description: Elevated 5xx share of total API requests
+      sop: API_SERVER_5XX_ERRORS.md

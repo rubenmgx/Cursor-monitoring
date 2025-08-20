@@ -1,0 +1,23 @@
+groups:
+- name: api-server.rps
+  rules:
+  - alert: APIServerRequestRateLow
+    expr: sum(rate(apiserver_request_total[5m])) < 1
+    for: 10m
+    labels:
+      severity: warning
+      team: sre
+    annotations:
+      summary: API Server request rate is near zero
+      description: API request rate dropped below 1 req/s across the cluster
+      sop: API_SERVER_REQUESTS_NOT_PROCESSED.md
+  - alert: APIServerInflightHighWithLowRPS
+    expr: sum(apiserver_current_inflight_requests) > 100 and sum(rate(apiserver_request_total[5m])) < 5
+    for: 10m
+    labels:
+      severity: critical
+      team: sre
+    annotations:
+      summary: High inflight with low RPS (possible stalls)
+      description: Requests are piling up while total RPS stays low
+      sop: API_SERVER_REQUESTS_NOT_PROCESSED.md

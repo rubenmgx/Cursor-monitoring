@@ -1,0 +1,13 @@
+groups:
+- name: api-server.429
+  rules:
+  - alert: APIServer429Throttling
+    expr: sum(rate(apiserver_request_total{code="429"}[5m])) > 1
+    for: 15m
+    labels:
+      severity: warning
+      team: sre
+    annotations:
+      summary: API Server 429 throttling
+      description: Sustained rate of HTTP 429 responses from API server
+      sop: API_SERVER_429_THROTTLING.md

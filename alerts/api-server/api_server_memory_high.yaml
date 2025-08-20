@@ -1,0 +1,25 @@
+groups:
+- name: api-server.memory
+  rules:
+  - alert: APIServerMemoryHighWarning
+    expr: 100 * (sum by (instance, source_cluster) (process_resident_memory_bytes{job="apiserver"})
+      / sum by (instance, source_cluster) (kube_pod_container_resource_limits{resource="memory", unit="byte", pod=~"kube-apiserver-.*"})) > 90
+    for: 20m
+    labels:
+      severity: warning
+      team: sre
+    annotations:
+      summary: API Server memory high (>90%)
+      description: Memory usage above 90% of limit on {{ $labels.instance }} (cluster={{ $labels.source_cluster }})
+      sop: API_SERVER_MEMORY_HIGH.md
+  - alert: APIServerMemoryHighCritical
+    expr: 100 * (sum by (instance, source_cluster) (process_resident_memory_bytes{job="apiserver"})
+      / sum by (instance, source_cluster) (kube_pod_container_resource_limits{resource="memory", unit="byte", pod=~"kube-apiserver-.*"})) > 95
+    for: 10m
+    labels:
+      severity: critical
+      team: sre
+    annotations:
+      summary: API Server memory high (>95%)
+      description: Memory usage above 95% of limit on {{ $labels.instance }} (cluster={{ $labels.source_cluster }})
+      sop: API_SERVER_MEMORY_HIGH.md

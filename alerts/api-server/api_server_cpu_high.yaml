@@ -1,0 +1,25 @@
+groups:
+- name: api-server.cpu
+  rules:
+  - alert: APIServerCPUHighWarning
+    expr: 100 * (sum by (instance, source_cluster) (rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-.*"}[5m]))
+      / sum by (instance, source_cluster) (kube_pod_container_resource_limits{resource="cpu", unit="core", pod=~"kube-apiserver-.*"})) > 90
+    for: 15m
+    labels:
+      severity: warning
+      team: sre
+    annotations:
+      summary: API Server CPU high (>90%)
+      description: CPU usage is above 90% of limit on {{ $labels.instance }} (cluster={{ $labels.source_cluster }})
+      sop: API_SERVER_CPU_HIGH.md
+  - alert: APIServerCPUHighCritical
+    expr: 100 * (sum by (instance, source_cluster) (rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-.*"}[5m]))
+      / sum by (instance, source_cluster) (kube_pod_container_resource_limits{resource="cpu", unit="core", pod=~"kube-apiserver-.*"})) > 95
+    for: 10m
+    labels:
+      severity: critical
+      team: sre
+    annotations:
+      summary: API Server CPU high (>95%)
+      description: CPU usage is above 95% of limit on {{ $labels.instance }} (cluster={{ $labels.source_cluster }})
+      sop: API_SERVER_CPU_HIGH.md

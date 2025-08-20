@@ -1,0 +1,13 @@
+groups:
+- name: api-server.tls
+  rules:
+  - alert: APIServerTLSHandshakeErrors
+    expr: rate(apiserver_tls_handshake_errors_total[5m]) > 0
+    for: 10m
+    labels:
+      severity: warning
+      team: sre
+    annotations:
+      summary: TLS handshake errors detected
+      description: API server is reporting TLS handshake errors
+      sop: API_SERVER_TLS_HANDSHAKE_ERRORS.md
