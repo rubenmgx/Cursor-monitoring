@@ -26,7 +26,7 @@ HTTP 5xx responses are elevated, indicating server-side failures or downstream d
   - `sum by (code)(rate(apiserver_request_total{code=~"5.."}[5m]))`
   - Top resources/verbs: `topk(10, sum by (resource,verb)(rate(apiserver_request_total{code=~"5.."}[5m])))`
 
-## Resolution
+## Resolution (Read-only investigation)
 
 1) Identify failing endpoints
 - In dashboard: isolate which resources/verbs lead errors.
@@ -35,17 +35,29 @@ HTTP 5xx responses are elevated, indicating server-side failures or downstream d
 sum by (resource,verb) (rate(apiserver_request_total{code=~"5.."}[5m]))
 ```
 
-2) Correlate with latency and timeouts
-- If p95/p99 elevated, errors may be timeout-related.
-
-3) Admission webhooks and dependencies
-```bash
-kubectl get validatingwebhookconfigurations,mutatingwebhookconfigurations -A | cat
+2) Admission controller checks (Kyverno, etcd-shield)
+```promql
+# Webhook rejection counts by name (if exposed)
+sum by (name) (rate(apiserver_admission_webhook_rejection_count[5m]))
+# Admission controller duration p95 by type/name
+histogram_quantile(0.95, sum by (le, type, name) (rate(apiserver_admission_controller_admission_duration_seconds_bucket[5m])))
+# Kyverno rules outcome
+sum by (policy, rule, result) (rate(kyverno_policy_rule_results_total[5m]))
 ```
-- Check logs of implicated webhooks/services.
+- Read-only cluster info:
+```bash
+kubectl get validatingwebhookconfigurations,mutatingwebhookconfigurations -A
+kubectl get cpol -A || true; kubectl get pol -A || true
+```
 
-4) Roll back or hotfix
-- Revert recent changes affecting failing endpoints; increase timeouts if backend is slow.
+3) Backend (etcd) health
+```promql
+histogram_quantile(0.95, sum by (le, operation) (rate(etcd_request_duration_seconds_bucket[5m])))
+max(etcd_server_has_leader)
+```
+
+4) Hand-off notes
+- Provide: failing resources/verbs, any implicated webhooks/policies, and etcd latency/leader status around the incident window.
 
 5) Validate recovery
 - 5xx share returns to baseline and latency normalizes.

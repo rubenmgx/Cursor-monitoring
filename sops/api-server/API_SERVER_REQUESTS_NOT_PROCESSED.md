@@ -28,7 +28,7 @@ API Server appears to stop processing requests (request rate drops to near zero)
   - Inflight requests:
     - `sum(apiserver_current_inflight_requests)`
 
-## Resolution
+## Resolution (Read-only investigation)
 
 1) Confirm the symptom
 - In dashboard, verify request rate near zero across instances and/or rising inflight with flat RPS.
@@ -55,6 +55,10 @@ kubectl -n default describe svc kubernetes | sed -n '1,200p'
 - Inspect admission webhooks and downstream dependencies.
 ```bash
 kubectl get validatingwebhookconfigurations,mutatingwebhookconfigurations -A | cat
+```
+ - Admission latency pivots (if metrics available):
+```promql
+histogram_quantile(0.95, sum by (le, type, name) (rate(apiserver_admission_controller_admission_duration_seconds_bucket[5m])))
 ```
 
 5) Mitigations
