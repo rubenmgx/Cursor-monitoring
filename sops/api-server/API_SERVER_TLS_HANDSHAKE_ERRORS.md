@@ -28,9 +28,26 @@ Clients fail to complete TLS handshakes to the API Server, causing connection fa
 
 ## Resolution
 
-1. If handshake errors spike:
-   - Verify recent certificate rotations (serving certs) and CA trust distribution to clients.
-   - Check TLS policy/protocol settings on ingress/LB paths.
-2. Validate server certificate chain and SANs match advertised endpoints.
-3. If specific client group failing, refresh their CA trust or credentials.
-4. Confirm decline in handshake errors and normalization of client success rates.
+1) Confirm spike and time window
+- In dashboard: check "Rate TLS handshake error" against incident time.
+- PromQL quick check:
+```promql
+rate(apiserver_tls_handshake_errors_total[5m])
+```
+
+2) Validate serving certs and trust
+```bash
+# Kubernetes service endpoints for API
+kubectl -n default get endpoints kubernetes -o wide
+# Test TLS directly from a node/pod (adjust host/IP accordingly)
+openssl s_client -connect <api-host-or-ip>:6443 -servername <api-hostname> -showcerts </dev/null 2>/dev/null | head -n 50
+```
+
+3) Check recent rotations and cert SANs
+- Verify that the presented certificate chain matches expected CA and SANs.
+
+4) Client-side trust
+- If specific clients fail, refresh their CA bundle or kubeconfig credentials.
+
+5) Validate recovery
+- Handshake error rate returns to zero and request success normalizes.

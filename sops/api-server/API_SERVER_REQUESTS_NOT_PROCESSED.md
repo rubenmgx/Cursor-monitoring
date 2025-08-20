@@ -30,10 +30,36 @@ API Server appears to stop processing requests (request rate drops to near zero)
 
 ## Resolution
 
-1. If request rate ~0 across instances:
-   - Verify apiserver availability signal and pod health; restart unhealthy pods if needed.
-   - Check control-plane networking and load balancer.
-2. If inflight rising while rate flat/low:
-   - Indicates stuck handlers; inspect admission webhooks and storage (etcd) health.
-   - Reduce client concurrency; restart the most impacted apiserver pod as a stopgap.
-3. Confirm recovery by observing request rate normalization and inflight returning to baseline.
+1) Confirm the symptom
+- In dashboard, verify request rate near zero across instances and/or rising inflight with flat RPS.
+- PromQL quick checks:
+```promql
+sum(rate(apiserver_request_total[5m]))
+sum(apiserver_current_inflight_requests)
+```
+
+2) Check apiserver and control plane health
+```bash
+NS=${APISERVER_NS:-openshift-kube-apiserver}
+kubectl -n $NS get pods -l component=kube-apiserver -o wide
+kubectl get --raw='/readyz?verbose' | head -100
+```
+
+3) Networking and LB
+```bash
+kubectl -n default get endpoints kubernetes -o wide
+kubectl -n default describe svc kubernetes | sed -n '1,200p'
+```
+
+4) If inflight rising but RPS flat (stalls)
+- Inspect admission webhooks and downstream dependencies.
+```bash
+kubectl get validatingwebhookconfigurations,mutatingwebhookconfigurations -A | cat
+```
+
+5) Mitigations
+- Restart the most impacted apiserver pod as a stopgap.
+- Reduce client concurrency/backoff.
+
+6) Validate recovery
+- RPS normalizes and inflight returns to baseline.

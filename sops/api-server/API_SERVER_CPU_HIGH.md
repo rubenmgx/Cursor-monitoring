@@ -32,12 +32,50 @@ API Server CPU usage is sustained above 90% of configured CPU limits or requeste
 
 ## Resolution
 
-1. Identify hot instances on CPU by Instance; confirm with per-instance CPU vs limits query.
-2. Check Request Rate by Instance for traffic skew; if skewed, verify endpoints and load balancer health.
-3. If CPU-bound:
-   - Increase kube-apiserver CPU limits or add replicas (if your control plane supports it).
-   - Reduce client concurrency/backoff for heavy controllers/clients.
-4. Reduce expensive operations:
-   - Use Request Rate by Resource and Verb and latency panels to find slow/noisy endpoints.
-   - Audit admission webhooks and LIST/WATCH consumers.
-5. Validate recovery: CPU < 80% sustained and latency normalizes over 10–30m.
+1) Locate hot instances and confirm load vs skew
+- In dashboard: open "CPU Usage by Instance" and "API Server Request Rate by Instance".
+- Shell checks (adjust namespace as needed):
+```bash
+NS=${APISERVER_NS:-openshift-kube-apiserver}
+# If not OpenShift, try kube-system
+kubectl get pods -n $NS -l component=kube-apiserver -o wide || kubectl get pods -n kube-system -l component=kube-apiserver -o wide
+# If metrics-server is installed
+kubectl top pod -n $NS -l component=kube-apiserver || true
+# Confirm apiserver backends behind the default service
+kubectl -n default get endpoints kubernetes -o wide
+```
+
+2) Verify readiness and health
+```bash
+# API readiness and liveness from inside the cluster
+kubectl get --raw='/readyz?verbose' | head -100
+kubectl get --raw='/livez?verbose' | head -100
+```
+
+3) Quantify CPU vs limits in Prometheus/Grafana Explore
+```promql
+sum by (instance,source_cluster)(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-.*"}[5m]))
+/
+sum by (instance,source_cluster)(kube_pod_container_resource_limits{resource="cpu", unit="core", pod=~"kube-apiserver-.*"})
+```
+
+4) Mitigations
+- If skewed traffic: investigate endpoints/LB; unhealthy pod may be excluded.
+```bash
+# Check pod conditions and recent events
+kubectl -n $NS describe pod -l component=kube-apiserver | sed -n '1,200p'
+kubectl -n $NS get events --sort-by=.lastTimestamp | tail -n 50
+```
+- If truly CPU-bound:
+  - Increase kube-apiserver CPU limits via your control-plane operator or manifests.
+  - Reduce client concurrency/backoff for heavy controllers.
+
+5) Identify expensive endpoints
+- In dashboard: "API Server - Request Rate by Resource and Verb" and latency panels.
+- PromQL for top heavy endpoints:
+```promql
+topk(10, sum by (resource, verb) (rate(apiserver_request_total[5m])))
+```
+
+6) Validate recovery
+- CPU drops < 80% sustained; latency returns to baseline over 10–30m.

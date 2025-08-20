@@ -31,9 +31,35 @@ API Server memory usage is sustained above 90% of configured limits or shows mon
 
 ## Resolution
 
-1. Identify instances with steady growth or >90% of limit.
-2. If limits too low, raise memory limits; otherwise restart the most impacted apiserver to relieve pressure (temporary).
-3. Investigate causes:
-   - Large LIST responses, watch fan-out, or cache growth.
-   - Admission webhooks buffering/serialization overhead.
-4. Reduce memory footprint or increase limits; monitor for stability over 30–60m.
+1) Verify pod health and restart history
+```bash
+NS=${APISERVER_NS:-openshift-kube-apiserver}
+kubectl -n $NS get pods -l component=kube-apiserver -o wide
+kubectl -n $NS describe pod -l component=kube-apiserver | sed -n '1,200p'
+```
+
+2) Quantify memory vs limits
+```promql
+sum by (instance,source_cluster) (process_resident_memory_bytes{job="apiserver"})
+/
+sum by (instance,source_cluster) (kube_pod_container_resource_limits{resource="memory", unit="byte", pod=~"kube-apiserver-.*"})
+```
+
+3) Look for growth patterns
+```promql
+avg_over_time(process_resident_memory_bytes{job="apiserver"}[30m])
+```
+
+4) Mitigations
+- If close to limits, increase memory limits for kube-apiserver.
+- If monotonic growth, restart the most impacted pod as a stopgap while investigating.
+
+5) Investigate likely causes
+- Large LIST/WATCH or cache growth:
+```promql
+topk(10, sum by (resource, verb) (rate(apiserver_request_total[5m])))
+```
+- Admission webhook overhead: correlate high latency on mutating verbs with webhook logs.
+
+6) Validate recovery
+- Memory stabilizes well below limits and latency normalizes for 30–60m.

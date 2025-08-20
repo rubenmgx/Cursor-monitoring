@@ -28,7 +28,19 @@ HTTP 429 responses indicate requests are being throttled, commonly due to priori
 
 ## Resolution
 
-1. Confirm 429 rise and whether the period is write-heavy.
-2. Reduce client concurrency and implement exponential backoff on callers.
-3. If persistent, tune APF (priority levels/queues) or increase apiserver capacity.
-4. Verify recovery: 429 rate declines and latency stabilizes.
+1) Confirm throttling and workload mix
+- In dashboard: confirm elevated 429; check if write-heavy via Write/Read panel.
+- PromQL quick checks:
+```promql
+sum(rate(apiserver_request_total{code="429"}[5m]))
+sum by (verb) (rate(apiserver_request_total[5m]))
+```
+
+2) Reduce pressure from heavy clients
+- Lower concurrency and implement exponential backoff.
+
+3) Consider APF tuning or capacity
+- Adjust priority levels/queues or increase apiserver capacity (replicas/resources).
+
+4) Validate recovery
+- 429 rate declines and latency stabilizes.

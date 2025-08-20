@@ -28,7 +28,24 @@ HTTP 5xx responses are elevated, indicating server-side failures or downstream d
 
 ## Resolution
 
-1. Identify top failing resources/verbs; inspect related admission webhooks and backend services.
-2. Check latency panels for timeouts vs immediate failures.
-3. Roll back recent changes impacting the failing endpoints; adjust timeouts if downstream is slow.
-4. Monitor 5xx share returning to baseline and latency normalization.
+1) Identify failing endpoints
+- In dashboard: isolate which resources/verbs lead errors.
+- PromQL drill-down:
+```promql
+sum by (resource,verb) (rate(apiserver_request_total{code=~"5.."}[5m]))
+```
+
+2) Correlate with latency and timeouts
+- If p95/p99 elevated, errors may be timeout-related.
+
+3) Admission webhooks and dependencies
+```bash
+kubectl get validatingwebhookconfigurations,mutatingwebhookconfigurations -A | cat
+```
+- Check logs of implicated webhooks/services.
+
+4) Roll back or hotfix
+- Revert recent changes affecting failing endpoints; increase timeouts if backend is slow.
+
+5) Validate recovery
+- 5xx share returns to baseline and latency normalizes.
