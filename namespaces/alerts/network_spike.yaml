@@ -1,0 +1,12 @@
+groups:
+- name: namespaces.network
+  rules:
+  - alert: NamespaceNetworkSpike
+    expr: sum by (namespace) (rate(container_network_transmit_bytes_total{container!=""}[5m]) + rate(container_network_receive_bytes_total{container!=""}[5m])) > 100000000
+    for: 10m
+    labels:
+      severity: info
+    annotations:
+      summary: Namespace network throughput spike
+      description: Elevated network traffic in {{ $labels.namespace }}
+      sop: NAMESPACE_NETWORK.md

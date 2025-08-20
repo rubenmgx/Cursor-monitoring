@@ -1,0 +1,12 @@
+groups:
+- name: namespaces.disk
+  rules:
+  - alert: NamespaceDiskIOHigh
+    expr: sum by (namespace) (rate(container_fs_reads_bytes_total[5m]) + rate(container_fs_writes_bytes_total[5m])) > 100000000
+    for: 10m
+    labels:
+      severity: info
+    annotations:
+      summary: Namespace disk IO spike
+      description: Elevated disk IO in {{ $labels.namespace }}
+      sop: NAMESPACE_DISK.md

@@ -1,0 +1,13 @@
+groups:
+- name: namespaces.memory
+  rules:
+  - alert: NamespaceMemoryHigh
+    expr: 100 * (sum by (namespace) (container_memory_working_set_bytes{container!=""})
+      / sum by (namespace) (cluster:namespace:pod_memory:active:kube_pod_container_resource_limits{resource="memory"})) > 90
+    for: 20m
+    labels:
+      severity: warning
+    annotations:
+      summary: Namespace memory above 90% of limits
+      description: {{ $labels.namespace }} memory utilization exceeds 90% of limits
+      sop: NAMESPACE_MEMORY_HIGH.md

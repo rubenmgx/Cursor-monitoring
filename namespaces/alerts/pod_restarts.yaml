@@ -1,0 +1,12 @@
+groups:
+- name: namespaces.pod-restarts
+  rules:
+  - alert: NamespacePodRestarts
+    expr: sum by (namespace) (increase(kube_pod_container_status_restarts_total[15m])) > 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: Pod restarts detected in namespace
+      description: One or more pods have restarted in {{ $labels.namespace }}
+      sop: NAMESPACE_POD_RESTARTS.md

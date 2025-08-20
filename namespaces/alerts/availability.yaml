@@ -1,0 +1,12 @@
+groups:
+- name: namespaces.availability
+  rules:
+  - alert: NamespaceAvailabilityDip
+    expr: (count_over_time(konflux_up{namespace!=""}==1[30m]) / count_over_time(konflux_up{namespace!=""}[30m])) < 0.99
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: Namespace availability dipped
+      description: Namespace availability below 99% over last 30m
+      sop: NAMESPACE_AVAILABILITY.md
