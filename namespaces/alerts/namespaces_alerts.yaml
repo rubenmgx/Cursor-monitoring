@@ -1,0 +1,59 @@
+groups:
+- name: namespaces.core
+  rules:
+  - alert: NamespacePodRestarts
+    expr: sum by (namespace) (increase(kube_pod_container_status_restarts_total[15m])) > 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: Pod restarts detected in namespace
+      description: One or more pods have restarted in {{ $labels.namespace }}
+      sop: NAMESPACE_POD_RESTARTS.md
+  - alert: NamespaceAvailabilityDip
+    expr: (count_over_time(konflux_up{namespace!=""}==1[30m]) / count_over_time(konflux_up{namespace!=""}[30m])) < 0.99
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: Namespace availability dipped
+      description: Namespace availability below 99% over last 30m
+      sop: NAMESPACE_AVAILABILITY.md
+  - alert: NamespaceCPUHigh
+    expr: 100 * (sum by (namespace) (node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate)
+      / sum by (namespace) (cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits{resource="cpu"})) > 90
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: Namespace CPU above 90% of limits
+      description: {{ $labels.namespace }} CPU utilization exceeds 90% of limits
+      sop: NAMESPACE_CPU_HIGH.md
+  - alert: NamespaceMemoryHigh
+    expr: 100 * (sum by (namespace) (container_memory_working_set_bytes{container!=""})
+      / sum by (namespace) (cluster:namespace:pod_memory:active:kube_pod_container_resource_limits{resource="memory"})) > 90
+    for: 20m
+    labels:
+      severity: warning
+    annotations:
+      summary: Namespace memory above 90% of limits
+      description: {{ $labels.namespace }} memory utilization exceeds 90% of limits
+      sop: NAMESPACE_MEMORY_HIGH.md
+  - alert: NamespaceNetworkSpike
+    expr: sum by (namespace) (rate(container_network_transmit_bytes_total{container!=""}[5m]) + rate(container_network_receive_bytes_total{container!=""}[5m])) > 100000000
+    for: 10m
+    labels:
+      severity: info
+    annotations:
+      summary: Namespace network throughput spike
+      description: Elevated network traffic in {{ $labels.namespace }}
+      sop: NAMESPACE_NETWORK.md
+  - alert: NamespaceDiskIOHigh
+    expr: sum by (namespace) (rate(container_fs_reads_bytes_total[5m]) + rate(container_fs_writes_bytes_total[5m])) > 100000000
+    for: 10m
+    labels:
+      severity: info
+    annotations:
+      summary: Namespace disk IO spike
+      description: Elevated disk IO in {{ $labels.namespace }}
+      sop: NAMESPACE_DISK.md
