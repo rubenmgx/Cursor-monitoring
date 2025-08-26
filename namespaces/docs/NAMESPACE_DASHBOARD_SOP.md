@@ -33,16 +33,16 @@ Tips:
 
 ### Availability
 - **Availability / Konflux_up Signal (timeseries)**: Monitors the percentage of time `konflux_up{namespace}` is 1 within the window. Use as a quick availability indicator for the namespace service.
-- **Number of Desired vs Actual Replicas / Namespace (stat)**: Monitors ratio of desired to available Deployment replicas. Values < 1 indicate pending/unavailable pods.
-- **Pod Restarts / Namespace (stat)**: Monitors recent increases in container restarts per namespace to surface instability and crash loops.
+- **Number of Desired vs Actual Replicas / Namespace (stat)**: Monitors the balance between desired and available Deployment replicas. A mismatch indicates pending/unavailable pods.
+- **Pod Restarts / Namespace (stat)**: Monitors recent container restarts per namespace (24h lookback) to surface instability and crash loops.
+- **Pod Status Phase (stat)**: Monitors distribution of pods across phases (Running/Pending/Failed/Unknown) to quickly spot surge in Pending/Failed.
 
 ### CPU / Memory
-- **CPU Utilisation (from requests) (stat)**: Monitors actual CPU usage vs requested CPU across selected namespaces to understand how close workloads are to their requested capacity.
-- **CPU Utilisation (from limits) (stat)**: Monitors actual CPU usage vs CPU limits to gauge throttling risk and headroom.
-- **CPU Usage Percentage (stat)**: Monitors overall CPU usage percentage for selected namespaces (approximate utilization relative to cluster CPU capacity over time).
+- **CPU Utilisation (from limits) (stat)**: Monitors CPU usage vs CPU limits to gauge throttling risk and headroom.
+- **CPU Usage Percentage (stat)**: Monitors overall CPU percentage for selected namespaces (relative to cluster CPU capacity over time).
 - **CPU Usage (timeseries)**: Monitors CPU cores used per namespace over time to visualize trends and bursts.
-- **Memory Utilisation (from requests) (stat)**: Monitors memory working set vs requested memory, indicating how close workloads are to requests.
 - **Memory Utilisation (from limits) (stat)**: Monitors memory working set vs memory limits to identify risk of OOM kills.
+- **Memory Usage Percentage (stat)**: Monitors overall memory percentage for selected namespaces (relative to node total).
 - **Memory Usage (timeseries)**: Monitors bytes of memory used per namespace over time for growth and spikes.
 
 ### Network / Disk
@@ -55,12 +55,12 @@ Tips:
 ## Common Investigations (Playbooks)
 
 1) Availability dips
-- Check in dashboard: "Availability / Konflux_up Signal" for drops; correlate with "Desired vs Actual Replicas" and "Pod Restarts".
+- Check in dashboard: "Availability / Konflux_up Signal" for drops; correlate with "Desired vs Actual Replicas", "Pod Status Phase" (Pending/Failed), and "Pod Restarts".
 - Relevant metrics: `konflux_up{namespace}`, `kube_deployment_status_replicas_available`, `kube_deployment_spec_replicas`, `kube_pod_container_status_restarts_total`.
 - Clues: Dips with replica shortfall → scaling/scheduling issues; dips with restarts → crashes or resource pressure.
 
 2) Under-replicated deployments
-- Check in dashboard: "Desired vs Actual Replicas" < 1. Also review CPU/Memory Utilisation to see if capacity limits block scheduling.
+- Check in dashboard: "Desired vs Actual Replicas" mismatch. Use "Pod Status Phase" for Pending/Failed spikes. Review CPU/Memory utilisation to see if capacity limits block scheduling.
 - Relevant metrics: `kube_deployment_status_replicas_available`, `kube_deployment_spec_replicas`, request/limit ratios from panels.
 - Clues: Adequate resources but replicas missing → image pull/backoff or failing readiness; high utilisation → quotas/requests too low.
 
@@ -69,10 +69,10 @@ Tips:
 - Relevant metrics: `kube_pod_container_status_restarts_total`, `container_memory_working_set_bytes`, `node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate`.
 - Clues: Restarts with high memory → OOM risk; with high CPU limits ratio → throttling or hot path.
 
-4) CPU saturation from requests
-- Check in dashboard: "CPU Utilisation (from requests)" and "CPU Usage (timeseries)" for sustained high values.
-- Relevant metrics: `node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate`, `cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests`.
-- Clues: > 100% of requests means requests set too low vs actual; adjust requests or optimize workload.
+4) CPU saturation
+- Check in dashboard: "CPU Utilisation (from limits)" and "CPU Usage (timeseries)" for sustained high values.
+- Relevant metrics: `node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate`, limits vs usage from panels (add requests via PromQL if needed).
+- Clues: Sustained high usage near limits indicates throttling risk; optimize workload or raise limits.
 
 5) CPU at limits / throttling risk
 - Check in dashboard: "CPU Utilisation (from limits)" and peaks in "CPU Usage (timeseries)".
@@ -80,8 +80,8 @@ Tips:
 - Clues: High limit utilisation + throttling counters rising → increase limits or reduce concurrency.
 
 6) Memory pressure
-- Check in dashboard: "Memory Utilisation (from limits/requests)" and "Memory Usage (timeseries)" for growth or spikes.
-- Relevant metrics: `container_memory_working_set_bytes`, `cluster:namespace:pod_memory:active:kube_pod_container_resource_{requests,limits}`, `namespace:container_memory_usage_bytes:sum`.
+- Check in dashboard: "Memory Utilisation (from limits)" and "Memory Usage (timeseries)" for growth or spikes.
+- Relevant metrics: `container_memory_working_set_bytes`, `cluster:namespace:pod_memory:active:kube_pod_container_resource_limits`, `namespace:container_memory_usage_bytes:sum`.
 - Clues: > 90% of limits with upward trend → OOM risk; right-size limits or fix leaks/caches.
 
 7) Hot namespace identification
